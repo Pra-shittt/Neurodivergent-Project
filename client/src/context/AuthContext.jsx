@@ -8,8 +8,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Restore from localStorage on mount
     const stored = localStorage.getItem('nd_user')
-    if (stored) setUser(JSON.parse(stored))
+    if (stored) {
+      try { setUser(JSON.parse(stored)) } catch { localStorage.removeItem('nd_user') }
+    }
     setLoading(false)
   }, [])
 
@@ -31,7 +34,8 @@ export function AuthProvider({ children }) {
     return res
   }
 
-  const logout = () => {
+  const logout = async () => {
+    try { await apiClient.logout() } catch { /* ignore */ }
     setUser(null)
     localStorage.removeItem('nd_user')
   }

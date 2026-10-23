@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken'
-import { serialize } from 'cookie'
 
 // Generate JWT and set it as a secure httpOnly cookie
 export const sendTokenResponse = (res, user) => {
@@ -13,7 +12,7 @@ export const sendTokenResponse = (res, user) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
     path: '/',
   }
 

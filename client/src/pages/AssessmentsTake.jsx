@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { mockApi } from '../services/mockApi'
+import { apiClient } from '../services/apiClient'
 import Modal from '../components/Modal'
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from 'recharts'
 import { ClipboardList, ChevronRight, CheckCircle2, Loader2, BarChart3, AlertTriangle } from 'lucide-react'
@@ -21,14 +21,14 @@ export default function AssessmentsTake() {
 
   useEffect(() => {
     Promise.all([
-      mockApi.getAssessmentTemplates(),
-      mockApi.getUserAssessments(user.id),
+      apiClient.getAssessmentTemplates(),
+      apiClient.getUserAssessments(user._id || user.id),
     ]).then(([t, a]) => {
       if (t.success) setTemplates(t.data.templates)
       if (a.success) setUserAssessments(a.data.assessments)
       setLoading(false)
     })
-  }, [user.id])
+  }, [user._id, user.id])
 
   const startAssessment = (template) => {
     setActiveTemplate(template)
@@ -48,7 +48,8 @@ export default function AssessmentsTake() {
   const submitAssessment = async () => {
     setSubmitting(true)
     const answersArr = Object.entries(answers).map(([questionId, value]) => ({ questionId, value }))
-    const res = await mockApi.submitAssessment(user.id, activeTemplate.id, answersArr)
+    const templateId = activeTemplate._id || activeTemplate.id
+    const res = await apiClient.submitAssessment(user._id || user.id, templateId, answersArr)
     if (res.success) {
       setResult(res.data.assessment)
       setUserAssessments(prev => [...prev, res.data.assessment])
@@ -204,10 +205,14 @@ export default function AssessmentsTake() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {templates.map(t => {
-          const completed = userAssessments.filter(a => a.templateId === t.id)
+          const tId = t._id || t.id
+          const completed = userAssessments.filter(a => {
+            const aTemplateId = a.templateId?._id || a.templateId || a.templateId
+            return aTemplateId === tId
+          })
           const latest = completed[completed.length - 1]
           return (
-            <div key={t.id} className="glass-card" style={{ padding: '22px 24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+            <div key={t._id || t.id} className="glass-card" style={{ padding: '22px 24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                   <ClipboardList size={17} color="var(--accent-purple)" />

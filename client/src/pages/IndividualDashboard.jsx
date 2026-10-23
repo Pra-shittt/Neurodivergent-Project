@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { mockApi } from '../services/mockApi'
+import { apiClient } from '../services/apiClient'
 import MetricSlider from '../components/MetricSlider'
 import Modal from '../components/Modal'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -29,11 +29,11 @@ export default function IndividualDashboard() {
   const [logForm, setLogForm] = useState({ mood: 3, executiveFunction: 3, sensoryOverload: 3, maskingFatigue: 3, triggers: [], journal: '' })
 
   useEffect(() => {
-    mockApi.getLogs(user.id).then(res => {
+    apiClient.getLogs(user._id || user.id).then(res => {
       if (res.success) setLogs(res.data.logs)
       setLoading(false)
     })
-  }, [user.id])
+  }, [user._id, user.id])
 
   const toggleTrigger = (t) => setLogForm(f => ({
     ...f,
@@ -42,7 +42,8 @@ export default function IndividualDashboard() {
 
   const submitLog = async () => {
     setSubmitting(true)
-    const res = await mockApi.submitLog(user.id, logForm)
+    const todayDate = new Date().toISOString().split('T')[0]
+    const res = await apiClient.submitLog(user._id || user.id, { ...logForm, date: todayDate })
     if (res.success) {
       setLogs(prev => {
         const idx = prev.findIndex(l => l.date === res.data.log.date)

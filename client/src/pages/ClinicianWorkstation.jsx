@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { mockApi } from '../services/mockApi'
+import { apiClient } from '../services/apiClient'
 import Modal from '../components/Modal'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2, Loader2, Search } from 'lucide-react'
@@ -32,15 +32,15 @@ export default function ClinicianWorkstation() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    mockApi.getClinicianPatients(user.id).then(res => {
+    apiClient.getClinicianPatients(user._id || user.id).then(res => {
       if (res.success) setPatients(res.data.patients)
       setLoading(false)
     })
-  }, [user.id])
+  }, [user._id, user.id])
 
   const openPatient = async (p) => {
     setSelectedPatient(p)
-    const res = await mockApi.getClinicalNotes(user.id, p.id)
+    const res = await apiClient.getClinicalNotes(user._id || user.id, p._id || p.id)
     if (res.success) setNotes(res.data.notes)
     setNoteModalOpen(true)
   }
@@ -48,7 +48,7 @@ export default function ClinicianWorkstation() {
   const saveNote = async () => {
     if (!noteText.trim()) return
     setSavingNote(true)
-    const res = await mockApi.addClinicalNote(user.id, selectedPatient.id, noteText)
+    const res = await apiClient.addClinicalNote(user._id || user.id, selectedPatient._id || selectedPatient.id, noteText)
     if (res.success) {
       setNotes(n => [...n, res.data.note])
       setNoteText('')
@@ -58,10 +58,10 @@ export default function ClinicianWorkstation() {
 
   const linkPatient = async () => {
     setLinkMsg(null)
-    const res = await mockApi.linkPatient(user.id, inviteCode)
+    const res = await apiClient.linkPatient(user._id || user.id, inviteCode)
     if (res.success) {
       setLinkMsg({ type: 'success', text: `✓ Linked ${res.data.patient.name} to your roster.` })
-      const refreshed = await mockApi.getClinicianPatients(user.id)
+      const refreshed = await apiClient.getClinicianPatients(user._id || user.id)
       if (refreshed.success) setPatients(refreshed.data.patients)
       setInviteCode('')
     } else {
@@ -152,7 +152,7 @@ export default function ClinicianWorkstation() {
         {filteredPatients.map(p => {
           const chartData = getChartData(p)
           return (
-            <div key={p.id} className="glass-card" style={{ padding: '22px 24px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div key={p._id || p.id} className="glass-card" style={{ padding: '22px 24px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               {/* Patient info */}
               <div style={{ flex: '1 1 200px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
@@ -215,12 +215,12 @@ export default function ClinicianWorkstation() {
       </div>
 
       {/* Clinical Notes Modal */}
-      <Modal isOpen={noteModalOpen} onClose={() => setNoteModalOpen(false)} title={`📝 Clinical Notes — ${selectedPatient?.name}`} maxWidth={560}>
+      <Modal isOpen={noteModalOpen} onClose={() => { setNoteModalOpen(false); setNoteText('') }} title={`📝 Clinical Notes — ${selectedPatient?.name}`} maxWidth={560}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {notes.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', textAlign: 'center', padding: '20px 0' }}>No notes yet.</p>}
             {notes.map(n => (
-              <div key={n.id} style={{ borderLeft: '3px solid var(--accent-purple)', paddingLeft: 12 }}>
+              <div key={n._id || n.id} style={{ borderLeft: '3px solid var(--accent-purple)', paddingLeft: 12 }}>
                 <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 4 }}>{new Date(n.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{n.content}</p>
               </div>
