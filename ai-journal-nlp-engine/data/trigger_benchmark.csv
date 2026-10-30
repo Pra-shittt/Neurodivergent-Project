@@ -1,0 +1,101 @@
+id,text,gold_label,notes
+1,"The flickering fluorescent lights gave me a splitting headache and I had to step outside.",SENSORY,Clear SENSORY — stimulus + negative response
+2,"I kept putting off the report even though it was due tomorrow and I knew I had to do it.",EXECUTIVE,Clear EXECUTIVE — procrastination + task urgency
+3,"I spent the whole meeting nodding and laughing along even though I had no idea what was funny.",SOCIAL_MASKING,Clear SOCIAL_MASKING — deliberate performance to fit in
+4,"I bought a new notebook yesterday.",NONE,Completely neutral — no trigger
+5,"The overlapping voices in the open-plan office made it impossible for me to form a single coherent thought.",SENSORY,Auditory overload + functional impairment
+6,"I stared at my task list for two hours without doing anything. I could not decide where to start.",EXECUTIVE,Task initiation failure
+7,"I rehearsed exactly what I was going to say before the phone call so I would not sound strange.",SOCIAL_MASKING,Pre-scripting to manage social presentation
+8,"We had pasta for dinner.",NONE,Completely neutral
+9,"The scratchy tag in my shirt collar was all I could think about during the entire presentation.",SENSORY,Tactile sensitivity + functional impairment
+10,"I have three reports, two meetings, and a call scheduled and I cannot figure out which one to start with.",EXECUTIVE,Prioritisation paralysis
+11,"I mirrored her posture and matched her tone of voice because I did not want her to notice I was struggling.",SOCIAL_MASKING,Deliberate behavioural mimicry to conceal distress
+12,"My appointment was rescheduled to Thursday.",NONE,Neutral scheduling fact
+13,"The strong perfume in the elevator made my eyes water and I could barely breathe.",SENSORY,Olfactory sensitivity + physical reaction
+14,"I sat down to write the email twelve times today and closed it every time. I never sent it.",EXECUTIVE,Task initiation and completion failure
+15,"I forced myself to keep smiling and engaging even though I was completely exhausted inside.",SOCIAL_MASKING,Emotional concealment to maintain social appearance
+16,"She wore a fabric coat.",NONE,Fabric mentioned with no sensory context
+17,"The constant buzz of the air conditioning unit made it impossible for me to hear anything the instructor said.",SENSORY,Auditory interference + functional impairment
+18,"I have been procrastinating on this project for three weeks because every time I sit down to start I freeze.",EXECUTIVE,Explicit procrastination + freeze response
+19,"I changed how I spoke — slower, clearer, using different words — so people would not think I was different.",SOCIAL_MASKING,Speech modification to mask difference
+20,"I finished reading the book.",NONE,Neutral completion statement
+21,"The crowd was so thick and loud that my heart started racing and I had to find a wall to lean against.",SENSORY,Sensory overwhelm from crowd + physiological response
+22,"I cannot organize my thoughts today. Every time I try to plan anything my mind goes completely blank.",EXECUTIVE,Cognitive disorganisation + planning failure
+23,"I watched how everyone else greeted each other and copied it exactly so I would not stand out.",SOCIAL_MASKING,Deliberate social mimicry
+24,"The dog kept barking this morning.",NONE,Sound mentioned — no evidence of distress in the writer
+25,"The strobe lighting at the concert was unbearable and I had to cover my eyes.",SENSORY,Visual sensitivity — explicit distress
+26,"I switched between six different tasks today and finished none of them.",EXECUTIVE,Task switching + completion failure
+27,"I kept my voice steady and calm during the argument even though I was furious and shaking inside.",SOCIAL_MASKING,Emotional suppression to manage social presentation
+28,"The project deadline is Friday.",NONE,Deadline mentioned — no evidence of struggle
+29,"The heat in the room was so intense I could not concentrate and had to open every window just to function.",SENSORY,Temperature sensitivity + functional impairment
+30,"I missed another deadline because I lost track of time and forgot the whole afternoon had passed.",EXECUTIVE,Time blindness + deadline failure
+31,"I pretended to understand the joke so nobody at the table would notice I was confused.",SOCIAL_MASKING,Pretending comprehension to avoid social detection
+32,"She organized the shelves alphabetically.",NONE,Neutral organisation action — no distress
+33,"The overlapping conversations and the impossible list of tasks I had not started left me completely unable to move.",SENSORY|EXECUTIVE,Auditory overload AND task paralysis — both independently supported
+34,"I spend the whole workday performing a calm competent version of myself and then collapse when I get home.",SOCIAL_MASKING,Extended masking + post-masking exhaustion
+35,"I made a to-do list.",NONE,Planning mentioned — no evidence of difficulty
+36,"The chemical smell from the cleaning products in the hallway triggered an instant headache and I had to detour.",SENSORY,Olfactory sensitivity + avoidance response
+37,"I kept reopening my email drafts and never managed to send a single response all afternoon.",EXECUTIVE,Task avoidance + initiation failure
+38,"I nodded along during the team discussion and agreed with everything because I did not want them to think I was difficult.",SOCIAL_MASKING,Agreement performance to manage social impression
+39,"I went to the supermarket.",NONE,Neutral action
+40,"Every sound in that café felt amplified — the coffee machine, the music, the murmur of voices — until I was ready to cry.",SENSORY,Auditory hyperreactivity + emotional response
+41,"I know exactly what I need to do but I cannot make myself start. I have been sitting here for hours.",EXECUTIVE,Task paralysis — explicit knowledge + inaction
+42,"I rehearsed my introduction four times in the bathroom mirror before the conference started.",SOCIAL_MASKING,Pre-scripting social performance
+43,"The meeting was long.",NONE,Social setting mentioned — no evidence of distress or masking
+44,"The seams of my socks kept digging in and I had to remove them before I could concentrate on anything else.",SENSORY,Tactile sensitivity — explicit removal + functional impairment
+45,"Switching from one project to another completely resets my brain and I lose everything I was holding.",EXECUTIVE,Explicit task-switching difficulty
+46,"I forced eye contact even though it felt like staring into the sun.",SOCIAL_MASKING,Effortful eye contact to appear socially normal
+47,"I finished all my tasks early today.",NONE,Task completion — no difficulty mentioned
+48,"The crowded train made me feel like the walls were closing in — I had to get off two stops early.",SENSORY,Environmental overload + avoidance behaviour
+49,"I had twelve browser tabs open and could not close any of them because they all felt equally urgent.",EXECUTIVE,Cognitive overwhelm + prioritisation paralysis
+50,"I laughed at the right moments during the presentation even though I had no idea what they were talking about.",SOCIAL_MASKING,Performance of comprehension to fit in
+51,"I won't pretend to understand the chemistry.",REVIEW,Figurative use of 'pretend' — not masking; but could be ambiguous to some
+52,"I was overwhelmed.",REVIEW,Too vague without context — could be SENSORY or EXECUTIVE or general
+53,"I tried not to stand out.",REVIEW,Masking candidate — but also an ordinary phrase; context insufficient
+54,"The noise at the party made socializing harder than usual.",SENSORY|SOCIAL_MASKING,Auditory distress AND social performance context — both independently present
+55,"I forced smiles through a noisy crowded room for three hours and then went to my car and sat in silence.",SENSORY|SOCIAL_MASKING,Sensory overload (noise + crowd) AND deliberate emotional masking
+56,"I had to plan every step of the conversation in advance and monitor my own facial expressions the entire time.",SOCIAL_MASKING,Deliberate cognitive pre-planning AND self-monitoring to mask natural behaviour
+57,"The background noise from the open office made it impossible to concentrate on the report I was supposed to be writing.",SENSORY|EXECUTIVE,Auditory interference causing executive function failure
+58,"I need to buy a new light bulb.",NONE,Light mentioned — neutral household task
+59,"She wore a fabric mask.",NONE,Fabric mentioned — COVID mask; no sensory distress
+60,"I turned down the music.",NONE,Sound management action — no distress evidence
+61,"The bright screen was hurting my eyes and I had to look away every few minutes.",SENSORY,Visual sensitivity + avoidance behaviour
+62,"I agreed to do the presentation even though the thought of it fills me with dread and I have no idea where to start.",EXECUTIVE,Task initiation anxiety + planning gap
+63,"I practised my laugh in the mirror so it would look natural.",SOCIAL_MASKING,Rehearsing social behaviour to appear authentic
+64,"We discussed the quarterly results.",NONE,Neutral professional statement
+65,"The hum of the refrigerator became unbearable around midnight and I had to move to another room to sleep.",SENSORY,Auditory sensitivity + displacement response
+66,"I broke the assignment into tiny pieces but even looking at the first piece made me want to close the laptop.",EXECUTIVE,Task chunking attempted — initiation still failed
+67,"I copied her way of greeting people because mine always seems to confuse them.",SOCIAL_MASKING,Deliberate behavioural copying to reduce social friction
+68,"The weather was nice today.",NONE,Completely neutral
+69,"The volume of the TV next door was loud enough to feel like it was in the room and I could not block it out.",SENSORY,Auditory sensitivity — inability to habituate
+70,"I have seventeen unread messages and I cannot bring myself to open a single one.",EXECUTIVE,Task avoidance / paralysis around communication
+71,"I performed enthusiasm about the project for the whole meeting so nobody would notice I was completely checked out.",SOCIAL_MASKING,Emotional performance to conceal disengagement
+72,"I went for a walk and came back feeling better.",NONE,Neutral positive statement — no trigger
+73,"The flickering strip light in the conference room made the whole afternoon feel like a migraine.",SENSORY,Visual sensitivity + extended impairment
+74,"The to-do list keeps growing and I keep avoiding the top item because I genuinely do not know how to begin.",EXECUTIVE,Task avoidance + initiation failure + growing backlog
+75,"I kept my responses short and professional in the meeting so nobody would realise I was in pain.",SOCIAL_MASKING,Deliberate presentation management to conceal internal state
+76,"The noise at the party bothered me a little.",SENSORY,Auditory distress — mild but present
+77,"I was late to the meeting.",NONE,Lateness mentioned — no evidence of time blindness or executive struggle
+78,"I watched the clock all afternoon but still somehow ran out of time before finishing a single task.",EXECUTIVE,Time monitoring failure — time blindness evidence
+79,"I changed my accent slightly in job interviews so I would sound more like what I thought they wanted.",SOCIAL_MASKING,Speech modification to manage impression
+80,"I read for an hour before bed.",NONE,Neutral leisure activity
+81,"The smell of the food in the open-plan kitchen wafted through the whole floor and made me feel sick for the entire afternoon.",SENSORY,Olfactory sensitivity + sustained physical impact
+82,"I have been trying to write this email for three days. Every draft feels wrong and I delete it and start over.",EXECUTIVE,Extended initiation/completion failure
+83,"I smiled and said I was fine when people asked how I was, because explaining the truth felt impossible.",SOCIAL_MASKING,Concealment of authentic state to meet social expectations
+84,"The party was crowded.",NONE,Crowd mentioned — no evidence of distress in the writer
+85,"The vibration of the bus engine under my feet was unbearable and I stood up for the rest of the journey.",SENSORY,Tactile sensitivity + avoidance behaviour
+86,"I wrote a detailed plan but could not execute a single step of it.",EXECUTIVE,Planning present — execution failure
+87,"I adjusted my word choices and body language every time I talked to a different person in that group.",SOCIAL_MASKING,Continuous social calibration to manage presentation
+88,"I took a nap.",NONE,Neutral rest activity
+89,"The combination of the loud music, the press of people, and the flashing lights meant I had to stand near the exit the whole night.",SENSORY,Multi-modal sensory overload + avoidance positioning
+90,"I know the task is simple but I have been unable to start it for a week and I cannot explain why.",EXECUTIVE,Task paralysis — classic executive dysfunction presentation
+91,"I kept my real reaction to myself and laughed with everyone else even though I did not find it funny at all.",SOCIAL_MASKING,Suppression of authentic reaction + performance of false one
+92,"She said she was tired.",NONE,Neutral third-person statement
+93,"The fluorescent lights in the waiting room buzzed constantly and every minute felt like an hour.",SENSORY,Auditory + visual sensory distress — time distortion
+94,"I cannot start working until my desk is perfectly clear, but clearing the desk also feels impossible.",EXECUTIVE,Initiation loop — environmental + cognitive barrier
+95,"I forced myself to attend the team lunch and smile and chat for ninety minutes even though I would rather have been anywhere else.",SOCIAL_MASKING,Sustained deliberate performance in social setting
+96,"I organised my files yesterday.",NONE,Neutral organisation action — no distress
+97,"The rough texture of the office chair fabric dug into the back of my legs for six hours and I could not stop noticing it.",SENSORY,Sustained tactile sensitivity + inability to habituate
+98,"I spent an hour opening and closing the same document, unable to write anything.",EXECUTIVE,Task paralysis — repeated failed initiation
+99,"I modulated my enthusiasm down at work because I did not want people to think I was strange.",SOCIAL_MASKING,Emotional regulation to conceal autistic/ADHD presentation
+100,"Everything felt like too much today.",REVIEW,Too vague — could be SENSORY EXECUTIVE or general; context needed
