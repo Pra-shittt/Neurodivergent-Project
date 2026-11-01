@@ -1,8 +1,18 @@
-
+import os
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 
-
+LOCAL_EMBEDDING_DIR = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "../models/hub/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    )
+)
+DEFAULT_MODEL_NAME = (
+    LOCAL_EMBEDDING_DIR
+    if os.path.isdir(LOCAL_EMBEDDING_DIR)
+    else "sentence-transformers/all-MiniLM-L6-v2"
+)
 
 CATEGORIES = {
     "SENSORY": (
@@ -33,10 +43,9 @@ CATEGORIES = {
 
 
 class SemanticEngine:
-    def __init__(self):
-        self.model = SentenceTransformer(
-            "sentence-transformers/all-MiniLM-L6-v2"
-        )
+    def __init__(self, model_name=None):
+        target_model = model_name or DEFAULT_MODEL_NAME
+        self.model = SentenceTransformer(target_model)
 
         self.category_names = list(CATEGORIES.keys())
 

@@ -1,6 +1,7 @@
 import User from '../models/User.js'
 import DailyLog from '../models/DailyLog.js'
 import ClinicalNote from '../models/ClinicalNote.js'
+import { UserAssessment } from '../models/Assessment.js'
 
 // GET /api/v1/clinician/patients
 export const getPatients = async (req, res, next) => {
@@ -22,7 +23,10 @@ export const getPatients = async (req, res, next) => {
           recentLogs.length === 3 &&
           recentLogs.every((l) => l.maskingFatigue >= 4)
 
-        return { ...patient.toObject(), recentLogs, burnoutFlag }
+        const assessments = await UserAssessment.find({ userId: pid })
+          .sort({ completedAt: -1 })
+
+        return { ...patient.toObject(), recentLogs, burnoutFlag, assessments }
       })
     )
 

@@ -8,10 +8,11 @@ export const sendTokenResponse = (res, user) => {
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   )
 
+  const isProd = process.env.NODE_ENV === 'production'
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
     path: '/',
   }
@@ -22,5 +23,12 @@ export const sendTokenResponse = (res, user) => {
 
 // Clear the auth cookie on logout
 export const clearTokenCookie = (res) => {
-  res.cookie('token', '', { httpOnly: true, expires: new Date(0), path: '/' })
+  const isProd = process.env.NODE_ENV === 'production'
+  res.cookie('token', '', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    expires: new Date(0),
+    path: '/',
+  })
 }

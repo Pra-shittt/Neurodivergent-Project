@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/apiClient'
 import MetricSlider from '../components/MetricSlider'
 import Modal from '../components/Modal'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Plus, TrendingUp, BookOpen, Zap, Eye, Tag, Loader2 } from 'lucide-react'
+import { Plus, TrendingUp, BookOpen, Zap, Eye, Tag, Loader2, Mic, Square, Upload, Sparkles, CheckCircle2, AlertCircle, Info, HelpCircle } from 'lucide-react'
 
 const TRIGGERS = ['Bright lights', 'Loud noises', 'Crowded spaces', 'Time pressure', 'Social demands', 'Unexpected changes', 'Strong smells', 'Physical touch', 'Screen time', 'Multitasking']
 
@@ -28,12 +28,34 @@ export default function IndividualDashboard() {
   const [submitting, setSubmitting] = useState(false)
   const [logForm, setLogForm] = useState({ mood: 3, executiveFunction: 3, sensoryOverload: 3, maskingFatigue: 3, triggers: [], journal: '' })
 
+  // Audio recording & STT states
+  const [recording, setRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [audioProcessing, setAudioProcessing] = useState(false)
+  const [audioError, setAudioError] = useState(null)
+  const [audioSuccess, setAudioSuccess] = useState(null)
+  const [showScoreGuide, setShowScoreGuide] = useState(false)
+
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
+  const timerRef = useRef(null)
+  const fileInputRef = useRef(null)
+
   useEffect(() => {
     apiClient.getLogs(user._id || user.id).then(res => {
       if (res.success) setLogs(res.data.logs)
       setLoading(false)
     })
   }, [user._id, user.id])
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+    }
+  }, [])
 
   const toggleTrigger = (t) => setLogForm(f => ({
     ...f,
@@ -52,8 +74,119 @@ export default function IndividualDashboard() {
       })
       setLogModalOpen(false)
       setLogForm({ mood: 3, executiveFunction: 3, sensoryOverload: 3, maskingFatigue: 3, triggers: [], journal: '' })
+      setAudioError(null)
+      setAudioSuccess(null)
     }
     setSubmitting(false)
+  }
+
+  // Audio transcription handling
+  const startRecording = async () => {
+    setAudioError(null)
+    setAudioSuccess(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        stream.getTracks().forEach(track => track.stop())
+        await processAudio(audioBlob)
+      }
+
+      mediaRecorder.start()
+      setRecording(true)
+      setRecordingTime(0)
+      timerRef.current = setInterval(() => {
+        setRecordingTime(t => t + 1)
+      }, 1000)
+    } catch (err) {
+      setAudioError('Microphone access denied or unavailable: ' + err.message)
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop()
+      setRecording(false)
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAudioError(null)
+    setAudioSuccess(null)
+    await processAudio(file)
+    e.target.value = ''
+  }
+
+  const processAudio = async (fileOrBlob) => {
+    setAudioProcessing(true)
+    setAudioError(null)
+    setAudioSuccess(null)
+    try {
+      const res = await apiClient.analyzeAudio(fileOrBlob, logForm)
+      if (res.success && res.data) {
+        const transcript = res.data.transcript
+        const insights = res.data.ai_insights
+
+        // Fill journal text
+        setLogForm(f => ({
+          ...f,
+          journal: f.journal ? `${f.journal}\n${transcript}` : transcript
+        }))
+
+        // Auto-match detected triggers with our list
+        const matchedTriggers = []
+        if (insights?.triggers?.length) {
+          insights.triggers.forEach(tr => {
+            const phrase = (tr.phrase || '').toLowerCase()
+            const match = TRIGGERS.find(t =>
+              t.toLowerCase().includes(phrase) ||
+              phrase.includes(t.toLowerCase().split(' ')[0])
+            )
+            if (match && !matchedTriggers.includes(match)) {
+              matchedTriggers.push(match)
+            }
+          })
+
+          if (matchedTriggers.length > 0) {
+            setLogForm(f => ({
+              ...f,
+              triggers: Array.from(new Set([...f.triggers, ...matchedTriggers]))
+            }))
+          }
+        }
+
+        setAudioSuccess(
+          matchedTriggers.length > 0
+            ? `Transcribed! AI auto-detected triggers: ${matchedTriggers.join(', ')}`
+            : res.data.notice || 'Audio transcribed successfully into your journal!'
+        )
+      } else {
+        const errorMsg = res.error?.includes('Network Error')
+          ? 'AI service on port 8000 is not reachable. Ensure FastAPI is running with: uvicorn app.main:app --port 8000'
+          : res.error || 'Could not transcribe audio clearly.'
+        setAudioError(errorMsg)
+      }
+    } catch (err) {
+      const errorMsg = err.message?.includes('Network Error')
+        ? 'AI service on port 8000 is not reachable. Ensure FastAPI is running with: uvicorn app.main:app --port 8000'
+        : err.message || 'Error processing audio.'
+      setAudioError(errorMsg)
+    } finally {
+      setAudioProcessing(false)
+    }
   }
 
   const chartData = logs.slice(-14).map(l => ({
@@ -148,7 +281,7 @@ export default function IndividualDashboard() {
           <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Recent Journal Entries</h2>
         </div>
         {logs.filter(l => l.journal).slice(-5).reverse().map(l => (
-          <div key={l.id} style={{ borderLeft: '3px solid var(--accent-purple)', paddingLeft: 14, marginBottom: 16 }}>
+          <div key={l.id || l._id} style={{ borderLeft: '3px solid var(--accent-purple)', paddingLeft: 14, marginBottom: 16 }}>
             <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>{l.date}</p>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{l.journal}</p>
             {l.triggers?.length > 0 && (
@@ -163,10 +296,56 @@ export default function IndividualDashboard() {
         )}
       </div>
 
-      {/* Log Modal */}
-      <Modal isOpen={logModalOpen} onClose={() => setLogModalOpen(false)} title="📋 Daily Check-In" maxWidth={540}>
+      {/* Log Modal with Voice STT Audio Option */}
+      <Modal isOpen={logModalOpen} onClose={() => setLogModalOpen(false)} title="📋 Daily Check-In" maxWidth={560}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Rate how you're feeling today on a scale of 1 (very low) to 5 (very high).</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Rate how you're feeling today on a scale of 1 (very low) to 5 (very high).</p>
+            <button
+              type="button"
+              onClick={() => setShowScoreGuide(s => !s)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--accent-teal)',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <HelpCircle size={13} /> {showScoreGuide ? 'Hide score guide' : 'What do these scores mean?'}
+            </button>
+          </div>
+
+          {showScoreGuide && (
+            <div style={{
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '12px 14px',
+              fontSize: '0.78rem',
+              lineHeight: 1.5,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}>
+              <div>
+                <strong style={{ color: 'var(--accent-teal)' }}>😊 Mood:</strong> Overall emotional state (1 = very low / distressed, 5 = positive / regulated).
+              </div>
+              <div>
+                <strong style={{ color: 'var(--accent-purple)' }}>🧩 Executive Function:</strong> Working memory, task initiation & mental focus (1 = ADHD paralysis / brain fog, 5 = strong flow & productivity).
+              </div>
+              <div>
+                <strong style={{ color: 'var(--accent-amber)' }}>🌊 Sensory Overload:</strong> Environmental sensitivity to noise, bright lights, crowds (1 = peaceful & calm, 5 = severe overload / shutdown).
+              </div>
+              <div>
+                <strong style={{ color: 'var(--accent-rose)' }}>🎭 Masking Fatigue:</strong> Exhaustion from suppressing neurodivergent traits or forcing social camouflage (1 = unmasked & natural, 5 = severe burnout).
+              </div>
+            </div>
+          )}
 
           <MetricSlider label="Mood" icon="😊" value={logForm.mood} onChange={v => setLogForm(f => ({ ...f, mood: v }))} colorVar="--accent-teal" />
           <MetricSlider label="Executive Function" icon="🧩" value={logForm.executiveFunction} onChange={v => setLogForm(f => ({ ...f, executiveFunction: v }))} colorVar="--accent-purple" />
@@ -189,24 +368,171 @@ export default function IndividualDashboard() {
             </div>
           </div>
 
-          {/* Journal */}
+          {/* Journal with Audio STT Voice Option */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <Eye size={15} color="var(--accent-teal)" />
-              <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Journal <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Eye size={15} color="var(--accent-teal)" />
+                <p style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Journal <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+                </p>
+              </div>
+
+              {/* Audio Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="audio/*,.webm,.wav,.mp3"
+                  style={{ display: 'none' }}
+                />
+
+                {!recording ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={startRecording}
+                      disabled={audioProcessing}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid var(--accent-purple)',
+                        background: 'rgba(124, 106, 247, 0.15)',
+                        color: 'var(--accent-purple-soft)',
+                        cursor: 'pointer',
+                      }}
+                      title="Speak your journal using microphone"
+                    >
+                      <Mic size={13} /> Record Audio
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={audioProcessing}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        padding: '4px 9px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'transparent',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                      }}
+                      title="Upload an audio file (.webm, .wav, .mp3)"
+                    >
+                      <Upload size={13} /> Upload Audio
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      padding: '4px 11px',
+                      borderRadius: 6,
+                      border: '1px solid var(--accent-rose)',
+                      background: 'rgba(248, 113, 113, 0.2)',
+                      color: 'var(--accent-rose)',
+                      cursor: 'pointer',
+                      animation: 'pulse 1.5s infinite',
+                    }}
+                  >
+                    <Square size={12} fill="currentColor" /> Stop & Transcribe ({recordingTime}s)
+                  </button>
+                )}
+              </div>
             </div>
-            <textarea value={logForm.journal} onChange={e => setLogForm(f => ({ ...f, journal: e.target.value }))}
-              placeholder="How are you feeling? What happened today?…"
-              className="input-field" style={{ minHeight: 90, resize: 'vertical', lineHeight: 1.6 }} />
+
+            {/* Audio Feedback States */}
+            {audioProcessing && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                marginBottom: 10,
+                borderRadius: 8,
+                background: 'rgba(124, 106, 247, 0.12)',
+                border: '1px solid var(--accent-purple)',
+                fontSize: '0.78rem',
+                color: 'var(--accent-purple-soft)',
+              }}>
+                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Transcribing audio & analyzing triggers with Whisper AI...</span>
+              </div>
+            )}
+
+            {audioSuccess && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                marginBottom: 10,
+                borderRadius: 8,
+                background: 'rgba(78, 205, 196, 0.12)',
+                border: '1px solid var(--accent-teal)',
+                fontSize: '0.78rem',
+                color: 'var(--accent-teal)',
+              }}>
+                <Sparkles size={14} />
+                <span>{audioSuccess}</span>
+              </div>
+            )}
+
+            {audioError && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                marginBottom: 10,
+                borderRadius: 8,
+                background: 'rgba(248, 113, 113, 0.12)',
+                border: '1px solid var(--accent-rose)',
+                fontSize: '0.78rem',
+                color: 'var(--accent-rose)',
+              }}>
+                <AlertCircle size={14} />
+                <span>{audioError}</span>
+              </div>
+            )}
+
+            <textarea
+              value={logForm.journal}
+              onChange={e => setLogForm(f => ({ ...f, journal: e.target.value }))}
+              placeholder="How are you feeling? Speak or type your journal entry here..."
+              className="input-field"
+              style={{ minHeight: 100, resize: 'vertical', lineHeight: 1.6 }}
+            />
           </div>
 
-          <button onClick={submitLog} disabled={submitting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <button onClick={submitLog} disabled={submitting || recording || audioProcessing} className="btn-primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {submitting ? <><Loader2 size={15} className="animate-spin" />Saving…</> : '✓ Save Check-In'}
           </button>
         </div>
       </Modal>
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+      `}</style>
     </div>
   )
 }

@@ -12,10 +12,10 @@ export const register = async (req, res, next) => {
     }
 
     const user = await User.create({ name, email, password, role, pronouns, diagnoses })
-    sendTokenResponse(res, user)
+    const token = sendTokenResponse(res, user)
 
     const { password: _, ...safeUser } = user.toObject()
-    res.status(201).json({ success: true, data: { user: safeUser } })
+    res.status(201).json({ success: true, data: { user: safeUser, token } })
   } catch (err) {
     next(err)
   }
@@ -31,10 +31,10 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ success: false, error: 'Invalid email or password.' })
     }
 
-    sendTokenResponse(res, user)
+    const token = sendTokenResponse(res, user)
 
     const { password: _, ...safeUser } = user.toObject()
-    res.json({ success: true, data: { user: safeUser } })
+    res.json({ success: true, data: { user: safeUser, token } })
   } catch (err) {
     next(err)
   }

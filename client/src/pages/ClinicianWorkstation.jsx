@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/apiClient'
 import Modal from '../components/Modal'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2, Loader2, Search } from 'lucide-react'
+import { Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2, Loader2, Search, ClipboardCheck, FileText, CheckCircle2 } from 'lucide-react'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -22,6 +22,8 @@ export default function ClinicianWorkstation() {
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedPatient, setSelectedPatient] = useState(null)
+  const [selectedPatientForAssessments, setSelectedPatientForAssessments] = useState(null)
+  const [assessmentModalOpen, setAssessmentModalOpen] = useState(false)
   const [notes, setNotes] = useState([])
   const [noteText, setNoteText] = useState('')
   const [noteModalOpen, setNoteModalOpen] = useState(false)
@@ -43,6 +45,11 @@ export default function ClinicianWorkstation() {
     const res = await apiClient.getClinicalNotes(user._id || user.id, p._id || p.id)
     if (res.success) setNotes(res.data.notes)
     setNoteModalOpen(true)
+  }
+
+  const openAssessments = (p) => {
+    setSelectedPatientForAssessments(p)
+    setAssessmentModalOpen(true)
   }
 
   const saveNote = async () => {
@@ -87,6 +94,7 @@ export default function ClinicianWorkstation() {
   )
 
   const burnoutCount = patients.filter(p => p.burnoutFlag).length
+  const totalAssessmentsCount = patients.reduce((acc, p) => acc + (p.assessments?.length || 0), 0)
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }} className="fade-in">
@@ -129,7 +137,7 @@ export default function ClinicianWorkstation() {
         {[
           { label: 'Total Patients', value: patients.length, color: '--accent-teal', icon: '👥' },
           { label: 'Active Alerts', value: burnoutCount, color: '--accent-rose', icon: '🚨' },
-          { label: 'Assessments Done', value: patients.length * 2, color: '--accent-purple', icon: '📋' },
+          { label: 'Completed Assessments', value: totalAssessmentsCount, color: '--accent-purple', icon: '📋' },
         ].map(s => (
           <div key={s.label} className="glass-card" style={{ padding: '16px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -142,7 +150,7 @@ export default function ClinicianWorkstation() {
       </div>
 
       {/* Patient roster */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {filteredPatients.length === 0 && (
           <div className="glass-card" style={{ padding: '40px', textAlign: 'center' }}>
             <Users size={36} color="var(--text-muted)" style={{ marginBottom: 12 }} />
@@ -151,10 +159,11 @@ export default function ClinicianWorkstation() {
         )}
         {filteredPatients.map(p => {
           const chartData = getChartData(p)
+          const patientAssessments = p.assessments || []
           return (
             <div key={p._id || p.id} className="glass-card" style={{ padding: '22px 24px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               {/* Patient info */}
-              <div style={{ flex: '1 1 200px' }}>
+              <div style={{ flex: '1 1 240px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                   <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-teal))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff', fontSize: '1rem', flexShrink: 0 }}>
                     {p.name[0]}
@@ -168,7 +177,7 @@ export default function ClinicianWorkstation() {
                   </div>
                 </div>
 
-                {/* Latest metrics */}
+                {/* Latest daily metrics */}
                 {p.recentLogs?.[p.recentLogs.length - 1] && (() => {
                   const l = p.recentLogs[p.recentLogs.length - 1]
                   return (
@@ -187,13 +196,48 @@ export default function ClinicianWorkstation() {
                     </div>
                   )
                 })()}
+
+                {/* Assessment score pills on the patient card */}
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ClipboardCheck size={12} color="var(--accent-teal)" /> Formal Assessments ({patientAssessments.length})
+                  </p>
+                  {patientAssessments.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {patientAssessments.map(a => {
+                        const bandColor = a.riskBand?.color === 'rose' ? 'var(--accent-rose)' : a.riskBand?.color === 'amber' ? 'var(--accent-amber)' : 'var(--accent-green)'
+                        return (
+                          <div
+                            key={a.id || a._id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              background: 'var(--bg-secondary)',
+                              border: `1px solid var(--border)`,
+                              fontSize: '0.72rem',
+                            }}
+                          >
+                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{a.templateName}</span>
+                            <span style={{ fontWeight: 700, color: bandColor }}>{a.totalScore}/{a.maxScore}</span>
+                            <span style={{ fontSize: '0.68rem', color: bandColor, opacity: 0.9 }}>({a.riskBand?.label?.split('—')[0]?.trim()})</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No assessments completed yet.</p>
+                  )}
+                </div>
               </div>
 
               {/* Mini trend chart */}
               {chartData.length > 0 && (
-                <div style={{ flex: '1 1 220px' }}>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}><TrendingUp size={11} />Recent Trend</p>
-                  <ResponsiveContainer width="100%" height={80}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}><TrendingUp size={11} />Recent 3-Day Trend</p>
+                  <ResponsiveContainer width="100%" height={90}>
                     <LineChart data={chartData}>
                       <Line type="monotone" dataKey="Masking" stroke="var(--accent-rose)" strokeWidth={1.5} dot={false} />
                       <Line type="monotone" dataKey="Mood" stroke="var(--accent-teal)" strokeWidth={1.5} dot={false} />
@@ -203,9 +247,33 @@ export default function ClinicianWorkstation() {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Action buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-                <button onClick={() => openPatient(p)} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', padding: '8px 14px' }}>
+                <button
+                  onClick={() => openAssessments(p)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: '0.8rem',
+                    padding: '7px 13px',
+                    borderRadius: 8,
+                    border: '1px solid var(--accent-teal)',
+                    background: 'rgba(78, 205, 196, 0.12)',
+                    color: 'var(--accent-teal)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <ClipboardCheck size={14} /> Assessments ({patientAssessments.length})
+                </button>
+
+                <button
+                  onClick={() => openPatient(p)}
+                  className="btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', padding: '7px 14px' }}
+                >
                   <NotebookPen size={14} /> Notes <ChevronRight size={13} />
                 </button>
               </div>
@@ -213,6 +281,98 @@ export default function ClinicianWorkstation() {
           )
         })}
       </div>
+
+      {/* Patient Assessments Modal */}
+      <Modal
+        isOpen={assessmentModalOpen}
+        onClose={() => setAssessmentModalOpen(false)}
+        title={`📋 Assessment Results — ${selectedPatientForAssessments?.name}`}
+        maxWidth={620}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {(!selectedPatientForAssessments?.assessments || selectedPatientForAssessments.assessments.length === 0) ? (
+            <div style={{ padding: '30px 20px', textAlign: 'center' }}>
+              <ClipboardCheck size={36} color="var(--text-muted)" style={{ marginBottom: 10 }} />
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                No completed psychometric assessments found for this patient yet.
+              </p>
+            </div>
+          ) : (
+            selectedPatientForAssessments.assessments.map(a => {
+              const bandColor = a.riskBand?.color === 'rose' ? 'var(--accent-rose)' : a.riskBand?.color === 'amber' ? 'var(--accent-amber)' : 'var(--accent-green)'
+              const pct = Math.round((a.totalScore / a.maxScore) * 100)
+              const sectionEntries = a.sectionScores ? Object.entries(a.sectionScores) : []
+
+              return (
+                <div
+                  key={a.id || a._id}
+                  style={{
+                    padding: '16px 18px',
+                    borderRadius: 12,
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+                    <div>
+                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {a.templateName}
+                      </h3>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Completed: {new Date(a.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '3px 10px',
+                          borderRadius: 99,
+                          color: bandColor,
+                          background: `${bandColor}22`,
+                          border: `1px solid ${bandColor}55`,
+                        }}
+                      >
+                        {a.riskBand?.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Total Score Meter */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: 4 }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Overall Score:</span>
+                      <span style={{ fontWeight: 800, color: bandColor }}>
+                        {a.totalScore} / {a.maxScore} ({pct}%)
+                      </span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 99, background: 'var(--border)', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: bandColor, borderRadius: 99, transition: 'width 0.4s' }} />
+                    </div>
+                  </div>
+
+                  {/* Subscale / Section Scores */}
+                  {sectionEntries.length > 0 && (
+                    <div style={{ paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 8 }}>Subscale Breakdown</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                        {sectionEntries.map(([sec, score]) => (
+                          <div key={sec} style={{ background: 'var(--bg-card)', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                            <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{sec}</p>
+                            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>{score}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      </Modal>
 
       {/* Clinical Notes Modal */}
       <Modal isOpen={noteModalOpen} onClose={() => { setNoteModalOpen(false); setNoteText('') }} title={`📝 Clinical Notes — ${selectedPatient?.name}`} maxWidth={560}>

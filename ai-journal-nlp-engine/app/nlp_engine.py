@@ -84,6 +84,22 @@ def detect_triggers(text):
     return found
 
 
+def analyze_journal_text(transcript: str, ratings: dict):
+    """Combine NLP triggers with user ratings.
+
+    Args:
+        transcript: The raw text from the audio transcription.
+        ratings: Dictionary with keys `mood`, `sensory_overload`, `executive_function`,
+                 and `masking_fatigue` (as used in the FastAPI endpoint).
+
+    Returns:
+        A dict containing:
+            - `triggers`: list of detected trigger dicts (phrase & category).
+            - `ratings`: echo of the supplied ratings.
+    """
+    triggers = detect_triggers(transcript)
+    return {"triggers": triggers, "ratings": ratings}
+
 if __name__ == "__main__":
     examples = [
         "The lights were flickering.",

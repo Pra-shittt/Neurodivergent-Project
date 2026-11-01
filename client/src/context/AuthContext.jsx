@@ -38,6 +38,7 @@ export function AuthProvider({ children }) {
     try { await apiClient.logout() } catch { /* ignore */ }
     setUser(null)
     localStorage.removeItem('nd_user')
+    localStorage.removeItem('nd_token')
   }
 
   return (

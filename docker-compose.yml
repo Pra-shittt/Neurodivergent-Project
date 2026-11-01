@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: neuroportal-db
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: neuroportal-api
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/neuroportal
+      - JWT_SECRET=prod_super_secret_neuroportal_key_replace_in_prod_684930
+      - JWT_EXPIRES_IN=7d
+      - CLIENT_URL=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  ai-service:
+    build:
+      context: ./server/ai-service
+      dockerfile: Dockerfile
+    container_name: neuroportal-ai-service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:5000/api/v1
+        - VITE_AI_SERVICE_URL=http://localhost:8000/api/v1
+    container_name: neuroportal-client
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+      - ai-service
+
+volumes:
+  mongo_data:
+

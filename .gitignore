@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+*/node_modules/
+venv/
+*/venv/
+.venv/
+*/.venv/
+
+# Python cache & test artifacts
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*/*/*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*/.pytest_cache/
+
+# Large ML / STT Model Weights (>100MB, downloaded automatically at runtime)
+models/hub/
+*/models/hub/
+*/*/models/hub/
+*.bin
+*.pt
+*.safetensors
+
+# Local Environment Variables & Secrets
+.env
+*/.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+*/dist/
+build/
+*/build/
+
+# Local databases & lockfiles
+local_db/
+*/local_db/
+*.log
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

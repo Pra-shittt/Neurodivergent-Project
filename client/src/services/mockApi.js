@@ -145,7 +145,52 @@ const ASSESSMENT_TEMPLATES = [
   },
 ]
 
-let USER_ASSESSMENTS = []
+let USER_ASSESSMENTS = [
+  {
+    id: 'assess-u1-catq',
+    userId: 'u1',
+    templateId: 'catq',
+    templateName: 'CAT-Q',
+    completedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+    totalScore: 38,
+    maxScore: 50,
+    sectionScores: { Compensation: 14, Masking: 15, Assimilation: 9 },
+    riskBand: { label: 'High Camouflaging', min: 36, max: 50, color: 'rose' },
+  },
+  {
+    id: 'assess-u1-asrs',
+    userId: 'u1',
+    templateId: 'asrs',
+    templateName: 'ASRS-v1.1',
+    completedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
+    totalScore: 16,
+    maxScore: 24,
+    sectionScores: { Inattention: 10, 'Hyperactivity/Impulsivity': 6 },
+    riskBand: { label: 'Moderate Symptoms', min: 9, max: 16, color: 'amber' },
+  },
+  {
+    id: 'assess-u3-asrs',
+    userId: 'u3',
+    templateId: 'asrs',
+    templateName: 'ASRS-v1.1',
+    completedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+    totalScore: 19,
+    maxScore: 24,
+    sectionScores: { Inattention: 11, 'Hyperactivity/Impulsivity': 8 },
+    riskBand: { label: 'High Symptom Burden', min: 17, max: 24, color: 'rose' },
+  },
+  {
+    id: 'assess-u3-aq10',
+    userId: 'u3',
+    templateId: 'aq10',
+    templateName: 'AQ-10',
+    completedAt: new Date(Date.now() - 10 * 86400000).toISOString(),
+    totalScore: 7,
+    maxScore: 10,
+    sectionScores: { 'Social Skills': 3, 'Attention Switching': 2, Communication: 2 },
+    riskBand: { label: 'Above Threshold — Further Assessment Recommended', min: 6, max: 10, color: 'rose' },
+  },
+]
 let CLINICAL_NOTES = []
 
 // ── Mock API ───────────────────────────────────────────────
@@ -254,7 +299,8 @@ export const mockApi = {
       const patientLogs = LOGS[pid] || []
       const recentLogs = patientLogs.slice(-3)
       const burnoutFlag = recentLogs.length === 3 && recentLogs.every(l => l.maskingFatigue >= 4)
-      return { ...safePatient, recentLogs, burnoutFlag }
+      const assessments = USER_ASSESSMENTS.filter(a => a.userId === pid)
+      return { ...safePatient, recentLogs, burnoutFlag, assessments }
     }).filter(Boolean)
 
     return { success: true, data: { patients } }
@@ -281,5 +327,30 @@ export const mockApi = {
     if (!clinician.patientIds.includes(patient.id)) clinician.patientIds.push(patient.id)
     patient.clinicianId = clinicianId
     return { success: true, data: { patient: { name: patient.name, id: patient.id } } }
+  },
+
+  // Audio transcription & NLP
+  async analyzeAudio(audioFile, ratings = {}) {
+    try {
+      const aiUrl = import.meta.env.VITE_AI_SERVICE_URL || 'http://localhost:8000/api/v1'
+      const form = new FormData()
+      form.append('audio_file', audioFile)
+      form.append('mood_rating', String(ratings.mood ?? 3))
+      form.append('sensory_overload_level', String(ratings.sensoryOverload ?? 1))
+      form.append('executive_function_level', String(ratings.executiveFunction ?? 3))
+      form.append('masking_fatigue_level', String(ratings.maskingFatigue ?? 1))
+      const res = await fetch(`${aiUrl}/analyze-audio`, { method: 'POST', body: form })
+      if (res.ok) {
+        const json = await res.json()
+        return { success: true, data: json.data }
+      }
+    } catch {
+      // Fallback to simulated NLP response if local AI service is not running
+    }
+    // Return clear connection error if local service is not reachable
+    return {
+      success: false,
+      error: 'Speech AI service on port 8000 is not reachable. Please start it with: uvicorn app.main:app --port 8000',
+    }
   },
 }

@@ -14,10 +14,29 @@ const app = express()
 
 // ── Security Middleware ─────────────────────────────────────
 app.use(helmet())
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true, // Allow cookies
-}))
+
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map((u) => u.trim())
+  : ['http://localhost:5173', 'http://127.0.0.1:5173']
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true)
+      if (
+        allowedOrigins.includes(origin) ||
+        process.env.NODE_ENV !== 'production' ||
+        /\.vercel\.app$/.test(new URL(origin).hostname) ||
+        /\.onrender\.com$/.test(new URL(origin).hostname)
+      ) {
+        return callback(null, true)
+      }
+      return callback(new Error(`Origin ${origin} not allowed by CORS`))
+    },
+    credentials: true, // Allow cookies
+  })
+)
 
 // ── Body Parsing ────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }))
