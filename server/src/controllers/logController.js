@@ -9,7 +9,7 @@ export const submitLog = async (req, res, next) => {
     const log = await DailyLog.findOneAndUpdate(
       { userId: req.user._id, date },
       { mood, executiveFunction, sensoryOverload, maskingFatigue, triggers, journal },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+      { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true }
     )
 
     res.status(201).json({ success: true, data: { log } })

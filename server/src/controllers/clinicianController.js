@@ -17,6 +17,13 @@ export const getPatients = async (req, res, next) => {
         const recentLogs = await DailyLog.find({ userId: pid })
           .sort({ date: -1 })
           .limit(3)
+          .lean()
+
+        // Journal sharing is independent from metric sharing. Keep journal text
+        // out of the roster payload when the patient has opted out.
+        if (!patient.privacySettings?.shareJournals) {
+          recentLogs.forEach((log) => { log.journal = '' })
+        }
 
         // Burnout flag: 3 consecutive days with maskingFatigue >= 4
         const burnoutFlag =
@@ -71,7 +78,10 @@ export const getPatientLogs = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Patient has restricted metric sharing.' })
     }
 
-    const logs = await DailyLog.find({ userId: patientId }).sort({ date: 1 })
+    const logs = await DailyLog.find({ userId: patientId }).sort({ date: 1 }).lean()
+    if (!patient.privacySettings?.shareJournals) {
+      logs.forEach((log) => { log.journal = '' })
+    }
     res.json({ success: true, data: { patient, logs } })
   } catch (err) {
     next(err)

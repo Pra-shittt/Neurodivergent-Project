@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/apiClient'
 import Modal from '../components/Modal'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2, Loader2, Search, ClipboardCheck, FileText, CheckCircle2 } from 'lucide-react'
+import { LineChart, Line, Tooltip, ResponsiveContainer } from 'recharts'
+import { Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2, Loader2, Search, ClipboardCheck } from 'lucide-react'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null

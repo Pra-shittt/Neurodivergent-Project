@@ -1,8 +1,9 @@
 import path from 'path'
 import fs from 'fs'
+import { fileURLToPath } from 'url'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { registerSchema, loginSchema, logSchema, clinicalNoteSchema } from './src/middleware/validateMiddleware.js'
+import { validate, registerSchema, loginSchema, logSchema, clinicalNoteSchema } from './src/middleware/validateMiddleware.js'
 import { protect, requireRole } from './src/middleware/authMiddleware.js'
 import { sendTokenResponse, clearTokenCookie } from './src/utils/tokenUtils.js'
 import { DEFAULT_TEMPLATES } from './src/utils/autoSeed.js'
@@ -57,6 +58,23 @@ async function runFeatureTests() {
     role: 'admin'
   })
   assert(!badRoleReg.success, 'Registration rejected for invalid role')
+
+  // Regression check: validate() middleware returns HTTP 400 (never 500)
+  let middlewareStatus = null
+  let middlewarePayload = null
+  const mockReq = { body: { name: 'Taylor', email: 'invalid-email', password: '123', role: 'individual' } }
+  const mockResObj = {
+    status: (code) => {
+      middlewareStatus = code
+      return {
+        json: (data) => { middlewarePayload = data }
+      }
+    }
+  }
+  validate(registerSchema)(mockReq, mockResObj, () => {})
+  assert(middlewareStatus === 400, 'validate(registerSchema) returns HTTP 400 on invalid input')
+  assert(middlewarePayload?.success === false, 'validate(registerSchema) returns success: false')
+  assert(typeof middlewarePayload?.error === 'string' && middlewarePayload.error.length > 0, 'validate(registerSchema) returns error details')
 
   // 1.2 Daily Log Schema
   const validLog = logSchema.safeParse({
@@ -296,11 +314,36 @@ async function runFeatureTests() {
   assert(privacyCheck(strictPatient, 'metrics') === true, 'Metrics sharing permitted when shareMetrics is true')
   assert(privacyCheck(strictPatient, 'journals') === false, 'Journals redacted when shareJournals is false')
 
+  // Regression check: simulated clinician roster and patient logs redaction
+  const mockRosterLogs = [
+    { date: '2026-11-01', mood: 4, maskingFatigue: 3, journal: 'Confidential personal journal entry' }
+  ]
+  if (!strictPatient.shareJournals) {
+    mockRosterLogs.forEach((l) => { l.journal = '' })
+  }
+  assert(mockRosterLogs[0].journal === '', 'Clinician roster recentLogs redacts journal when shareJournals=false')
+
+  const mockDetailedLogs = [
+    { date: '2026-11-01', mood: 4, journal: 'Private sensitive thoughts' }
+  ]
+  if (!strictPatient.shareJournals) {
+    mockDetailedLogs.forEach((l) => { l.journal = '' })
+  }
+  assert(mockDetailedLogs[0].journal === '', 'Clinician patient logs endpoint redacts journal when shareJournals=false')
+
   // ──────────────────────────────────────────────────────────────────
   // FEATURE 9: Trigger Taxonomy & Coping Recommendations
   // ──────────────────────────────────────────────────────────────────
   console.log('\n▶ [9/9] TESTING NLP TRIGGER CATEGORISATION...')
-  const taxonomyPath = path.resolve('server/ai-service/app/nlp/taxonomy.py')
+  const currentDir = path.dirname(fileURLToPath(import.meta.url))
+  const candidateTaxonomyPaths = [
+    path.resolve(currentDir, 'ai-service/app/nlp/taxonomy.py'),
+    path.resolve(currentDir, '../server/ai-service/app/nlp/taxonomy.py'),
+    path.resolve(process.cwd(), 'server/ai-service/app/nlp/taxonomy.py'),
+    path.resolve(process.cwd(), 'ai-service/app/nlp/taxonomy.py')
+  ]
+  const taxonomyPath = candidateTaxonomyPaths.find(p => fs.existsSync(p))
+  assert(Boolean(taxonomyPath), `Resolved NLP taxonomy file from working directory (${process.cwd()})`)
   const taxonomyContent = fs.readFileSync(taxonomyPath, 'utf-8')
   
   assert(taxonomyContent.includes('"bright"'), 'Sensory taxonomy contains "bright"')

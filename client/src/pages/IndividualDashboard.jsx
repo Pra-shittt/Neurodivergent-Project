@@ -4,7 +4,7 @@ import { apiClient } from '../services/apiClient'
 import MetricSlider from '../components/MetricSlider'
 import Modal from '../components/Modal'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Plus, TrendingUp, BookOpen, Zap, Eye, Tag, Loader2, Mic, Square, Upload, Sparkles, CheckCircle2, AlertCircle, Info, HelpCircle } from 'lucide-react'
+import { Plus, TrendingUp, BookOpen, Zap, Eye, Tag, Loader2, Mic, Square, Upload, Sparkles, AlertCircle, HelpCircle } from 'lucide-react'
 
 const TRIGGERS = ['Bright lights', 'Loud noises', 'Crowded spaces', 'Time pressure', 'Social demands', 'Unexpected changes', 'Strong smells', 'Physical touch', 'Screen time', 'Multitasking']
 

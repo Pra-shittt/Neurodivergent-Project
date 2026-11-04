@@ -134,10 +134,10 @@ export const api = {
   getAssessmentTemplates: () =>
     safe(() => client.get('/assessments/templates')),
 
-  getUserAssessments: (userId) =>
+  getUserAssessments: (_userId) =>
     safe(() => client.get('/assessments/my-results')),
 
-  submitAssessment: (userId, templateId, answers) =>
+  submitAssessment: (_userId, templateId, answers) =>
     safe(() => client.post('/assessments/submit', { templateId, answers })),
 
   // User Profile
@@ -151,15 +151,15 @@ export const api = {
     safe(() => client.get('/users/invite-code')),
 
   // Clinician
-  getClinicianPatients: (clinicianId) =>
+  getClinicianPatients: (_clinicianId) =>
     safe(() => client.get('/clinician/patients')),
 
-  getClinicalNotes: (clinicianId, patientId) =>
+  getClinicalNotes: (_clinicianId, patientId) =>
     safe(() => client.get(`/clinician/patients/${patientId}/notes`)),
 
-  addClinicalNote: (clinicianId, patientId, content) =>
+  addClinicalNote: (_clinicianId, patientId, content) =>
     safe(() => client.post('/clinician/notes', { patientId, content })),
 
-  linkPatient: (clinicianId, inviteCode) =>
+  linkPatient: (_clinicianId, inviteCode) =>
     safe(() => client.post('/clinician/link-patient', { inviteCode })),
 }

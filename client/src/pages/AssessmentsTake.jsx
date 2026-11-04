@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/apiClient'
-import Modal from '../components/Modal'
-import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, Tooltip } from 'recharts'
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { ClipboardList, ChevronRight, CheckCircle2, Loader2, BarChart3, AlertTriangle } from 'lucide-react'
 
 const bandColor = { green: '--accent-green', amber: '--accent-amber', rose: '--accent-rose' }
@@ -17,7 +16,6 @@ export default function AssessmentsTake() {
   const [currentQ, setCurrentQ] = useState(0)
   const [result, setResult] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  const [resultModal, setResultModal] = useState(null)
 
   useEffect(() => {
     Promise.all([

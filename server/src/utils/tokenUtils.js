@@ -2,9 +2,10 @@ import jwt from 'jsonwebtoken'
 
 // Generate JWT and set it as a secure httpOnly cookie
 export const sendTokenResponse = (res, user) => {
+  const secret = process.env.JWT_SECRET || 'neuroportal_default_jwt_secret_dev'
   const token = jwt.sign(
     { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
+    secret,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   )
 

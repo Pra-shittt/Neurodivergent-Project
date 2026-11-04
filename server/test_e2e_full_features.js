@@ -1,5 +1,8 @@
+import 'dotenv/config'
 import path from 'path'
 import mongoose from 'mongoose'
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'neuroportal_e2e_test_secret_key_849204'
 import app from './app.js'
 import User from './src/models/User.js'
 import DailyLog from './src/models/DailyLog.js'
@@ -10,13 +13,14 @@ import { autoSeedTemplates } from './src/utils/autoSeed.js'
 async function runFullE2ETest() {
   let serverInstance = null
   try {
-    console.log('Connecting to active test MongoDB on port 27018...')
-    await mongoose.connect('mongodb://127.0.0.1:27018/neuroportal_e2e_test', {
-      serverSelectionTimeoutMS: 3000
+    const mongoUri = process.env.E2E_MONGO_URI || 'mongodb://127.0.0.1:27018/neuroportal_e2e_test'
+    console.log(`Connecting to isolated E2E database: ${mongoUri}`)
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000
     })
-    console.log('✅ Connected to MongoDB on port 27018!\n')
+    console.log(`✅ Connected to isolated MongoDB database: ${mongoUri}\n`)
 
-    // Clean test database
+    // Clean ONLY the isolated test database
     await mongoose.connection.dropDatabase()
 
     // Start Express HTTP server
@@ -38,18 +42,35 @@ async function runFullE2ETest() {
     console.log('===============================================================\n')
 
     // ─────────────────────────────────────────────────────────────
-    // FEATURE 0: Database Auto-Seeding
+    // FEATURE 0: Health Check & Database Auto-Seeding
     // ─────────────────────────────────────────────────────────────
-    console.log('▶ [0/8] TESTING ASSESSMENT TEMPLATES AUTO-SEEDING...')
+    console.log('▶ [0/9] TESTING SERVER HEALTH & ASSESSMENT AUTO-SEEDING...')
+    const healthRes = await apiFetch('/health')
+    console.log(`  ✓ Health check: HTTP ${healthRes.status} (Status: ${healthRes.body.data?.status})`)
+    if (healthRes.status !== 200 || healthRes.body.data?.status !== 'OK') {
+      throw new Error(`Health check failed: ${JSON.stringify(healthRes.body)}`)
+    }
+
     await autoSeedTemplates()
     const templates = await AssessmentTemplate.find({ isActive: true })
     console.log(`  ✓ Templates in DB: ${templates.length} (${templates.map(t => t.name).join(', ')})`)
     if (templates.length < 3) throw new Error('Auto-seed failed to insert all templates')
 
     // ─────────────────────────────────────────────────────────────
-    // FEATURE 1: Register New Individual Account
+    // FEATURE 1: Registration Validation & Individual Account
     // ─────────────────────────────────────────────────────────────
-    console.log('\n▶ [1/8] TESTING NEW INDIVIDUAL ACCOUNT REGISTRATION...')
+    console.log('\n▶ [1/9] TESTING REGISTRATION (VALIDATION & INDIVIDUAL CREATION)...')
+    
+    // Regression check: Invalid registration MUST return HTTP 400 (never 500)
+    const invalidRegRes = await apiFetch('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Jordan', email: 'not-an-email', password: '123', role: 'individual' })
+    })
+    console.log(`  ✓ Invalid registration rejected: HTTP ${invalidRegRes.status} (${invalidRegRes.body.error})`)
+    if (invalidRegRes.status !== 400) {
+      throw new Error(`Expected HTTP 400 for invalid registration, got ${invalidRegRes.status}`)
+    }
+
     const patientPayload = {
       name: 'Jordan Miller',
       email: 'jordan.miller@neurotest.org',
@@ -165,6 +186,16 @@ async function runFullE2ETest() {
     console.log(`  ✓ Clinician patient roster count: ${rosterRes.body.data?.patients?.length}`)
     console.log(`  ✓ Roster patient name: ${rosterRes.body.data?.patients?.[0]?.name}`)
 
+    // Test role-based access control: patient attempting to access clinician route
+    const forbiddenRes = await apiFetch('/clinician/patients', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${patientToken}` }
+    })
+    console.log(`  ✓ Role gate blocks patient from /clinician/patients: HTTP ${forbiddenRes.status}`)
+    if (forbiddenRes.status !== 403) {
+      throw new Error(`Expected HTTP 403 for individual accessing clinician route, got ${forbiddenRes.status}`)
+    }
+
     // ─────────────────────────────────────────────────────────────
     // FEATURE 5: Daily Logging & Emotional/Sensory Tracking
     // ─────────────────────────────────────────────────────────────
@@ -248,6 +279,35 @@ async function runFullE2ETest() {
     const linkedPatient = updatedRosterRes.body.data?.patients?.[0]
     console.log(`  ✓ Clinician sees patient's assessment score: ${linkedPatient?.assessments?.[0]?.totalScore}/${linkedPatient?.assessments?.[0]?.maxScore}`)
     console.log(`  ✓ Clinician sees risk band label: "${linkedPatient?.assessments?.[0]?.riskBand?.label}"`)
+
+    // Privacy check 1: Patient has shareJournals=false by default -> verify recentLogs redacts journal in roster
+    const rosterPatientRecentLog = linkedPatient?.recentLogs?.[0]
+    console.log(`  ✓ Privacy Check: Roster recentLogs journal text is redacted: "${rosterPatientRecentLog?.journal}"`)
+    if (rosterPatientRecentLog?.journal !== '') {
+      throw new Error(`Privacy breach: journal was not redacted in roster! Value: "${rosterPatientRecentLog?.journal}"`)
+    }
+
+    // Privacy check 2: Clinician queries patient logs -> verify journal is redacted
+    const patientDetailedLogsRes = await apiFetch(`/clinician/patients/${patientId}/logs`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${clinicianToken}` }
+    })
+    console.log(`  ✓ Privacy Check: Patient detailed logs journal text is redacted: "${patientDetailedLogsRes.body.data?.logs?.[0]?.journal}"`)
+    if (patientDetailedLogsRes.body.data?.logs?.[0]?.journal !== '') {
+      throw new Error(`Privacy breach: journal was not redacted in detailed logs! Value: "${patientDetailedLogsRes.body.data?.logs?.[0]?.journal}"`)
+    }
+
+    // Privacy check 3: When patient sets shareMetrics=false -> clinician is blocked with 403
+    await User.findByIdAndUpdate(patientId, { 'privacySettings.shareMetrics': false })
+    const blockedMetricsRes = await apiFetch(`/clinician/patients/${patientId}/logs`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${clinicianToken}` }
+    })
+    console.log(`  ✓ Privacy Check: Accessing logs blocked when shareMetrics=false: HTTP ${blockedMetricsRes.status} (${blockedMetricsRes.body.error})`)
+    if (blockedMetricsRes.status !== 403) {
+      throw new Error(`Expected HTTP 403 when shareMetrics=false, got ${blockedMetricsRes.status}`)
+    }
+    await User.findByIdAndUpdate(patientId, { 'privacySettings.shareMetrics': true })
 
     // Add a Clinical Note
     const noteRes = await apiFetch('/clinician/notes', {
