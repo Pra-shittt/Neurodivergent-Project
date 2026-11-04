@@ -8,6 +8,7 @@ import userRoutes from './src/routes/userRoutes.js'
 import logRoutes from './src/routes/logRoutes.js'
 import assessmentRoutes from './src/routes/assessmentRoutes.js'
 import clinicianRoutes from './src/routes/clinicianRoutes.js'
+import aiRoutes from './src/routes/aiRoutes.js'
 import { errorHandler, notFound } from './src/middleware/errorMiddleware.js'
 
 const app = express()
@@ -110,6 +111,7 @@ app.use('/api/v1/users', userRoutes)
 app.use('/api/v1/logs', logRoutes)
 app.use('/api/v1/assessments', assessmentRoutes)
 app.use('/api/v1/clinician', clinicianRoutes)
+app.use('/api/v1/ai', aiRoutes)
 
 // ── Error Handling ──────────────────────────────────────────
 app.use(notFound)

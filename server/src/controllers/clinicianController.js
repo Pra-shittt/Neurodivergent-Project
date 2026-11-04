@@ -7,33 +7,56 @@ import { UserAssessment } from '../models/Assessment.js'
 export const getPatients = async (req, res, next) => {
   try {
     const clinician = await User.findById(req.user._id).select('patientIds')
-    const patientIds = clinician.patientIds || []
+    const patientIdsFromClinician = (clinician?.patientIds || []).map(String)
+
+    // Also look up patients who have this clinician assigned by clinicianId
+    const patientsByRef = await User.find({ clinicianId: req.user._id, role: 'individual' }).select('_id')
+    const patientIdsFromRef = patientsByRef.map(p => String(p._id))
+
+    const allPatientIds = Array.from(new Set([...patientIdsFromClinician, ...patientIdsFromRef]))
+
+    // Sync roster if any reference was missing in patientIds array
+    if (patientIdsFromRef.some(id => !patientIdsFromClinician.includes(id))) {
+      await User.findByIdAndUpdate(req.user._id, { $addToSet: { patientIds: { $each: patientIdsFromRef } } })
+    }
 
     const patients = await Promise.all(
-      patientIds.map(async (pid) => {
+      allPatientIds.map(async (pid) => {
         const patient = await User.findById(pid).select('-password')
         if (!patient) return null
 
         const recentLogs = await DailyLog.find({ userId: pid })
           .sort({ date: -1 })
-          .limit(3)
+          .limit(7)
           .lean()
 
-        // Journal sharing is independent from metric sharing. Keep journal text
-        // out of the roster payload when the patient has opted out.
-        if (!patient.privacySettings?.shareJournals) {
-          recentLogs.forEach((log) => { log.journal = '' })
-        }
+        // Check journal sharing setting: redact if patient opted out
+        const shareJournals = Boolean(patient.privacySettings?.shareJournals)
+        const shareMetrics = Boolean(patient.privacySettings?.shareMetrics ?? true)
+
+        const sanitizedLogs = recentLogs.map((log) => ({
+          ...log,
+          journal: shareJournals ? (log.journal || '') : '',
+          mood: shareMetrics ? log.mood : null,
+          executiveFunction: shareMetrics ? log.executiveFunction : null,
+          sensoryOverload: shareMetrics ? log.sensoryOverload : null,
+          maskingFatigue: shareMetrics ? log.maskingFatigue : null,
+        }))
 
         // Burnout flag: 3 consecutive days with maskingFatigue >= 4
         const burnoutFlag =
-          recentLogs.length === 3 &&
-          recentLogs.every((l) => l.maskingFatigue >= 4)
+          recentLogs.length >= 3 &&
+          recentLogs.slice(0, 3).every((l) => l.maskingFatigue >= 4)
 
         const assessments = await UserAssessment.find({ userId: pid })
           .sort({ completedAt: -1 })
 
-        return { ...patient.toObject(), recentLogs, burnoutFlag, assessments }
+        return {
+          ...patient.toObject(),
+          recentLogs: sanitizedLogs,
+          burnoutFlag,
+          assessments,
+        }
       })
     )
 
@@ -47,7 +70,16 @@ export const getPatients = async (req, res, next) => {
 export const linkPatient = async (req, res, next) => {
   try {
     const { inviteCode } = req.body
-    const patient = await User.findOne({ inviteCode, role: 'individual' })
+    const code = (inviteCode || '').trim()
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Invite code is required.' })
+    }
+
+    // Case-insensitive invite code lookup
+    const patient = await User.findOne({
+      inviteCode: new RegExp(`^${code}$`, 'i'),
+      role: 'individual',
+    })
     if (!patient) {
       return res.status(404).json({ success: false, error: 'Invalid invite code.' })
     }
@@ -64,25 +96,65 @@ export const linkPatient = async (req, res, next) => {
   }
 }
 
+// POST /api/v1/clinician/unlink-patient
+export const unlinkPatient = async (req, res, next) => {
+  try {
+    const { patientId } = req.body
+    if (!patientId) {
+      return res.status(400).json({ success: false, error: 'Patient ID is required.' })
+    }
+
+    await User.findByIdAndUpdate(req.user._id, { $pull: { patientIds: patientId } })
+    await User.findByIdAndUpdate(patientId, { clinicianId: null })
+
+    res.json({ success: true, data: { message: 'Patient removed from roster.' } })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // GET /api/v1/clinician/patients/:patientId/logs
 export const getPatientLogs = async (req, res, next) => {
   try {
     const { patientId } = req.params
     const clinician = await User.findById(req.user._id).select('patientIds')
-    if (!clinician.patientIds.map(String).includes(patientId)) {
+    const patient = await User.findById(patientId).select('privacySettings name pronouns clinicianId')
+    if (!patient) {
+      return res.status(404).json({ success: false, error: 'Patient not found.' })
+    }
+
+    const isInRoster = (clinician?.patientIds || []).map(String).includes(patientId)
+    const isLinked = String(patient.clinicianId) === String(req.user._id)
+    if (!isInRoster && !isLinked) {
       return res.status(403).json({ success: false, error: 'Patient not in your roster.' })
     }
 
-    const patient = await User.findById(patientId).select('privacySettings name pronouns')
-    if (!patient.privacySettings.shareMetrics) {
-      return res.status(403).json({ success: false, error: 'Patient has restricted metric sharing.' })
-    }
+    const logs = await DailyLog.find({ userId: patientId }).sort({ date: -1 }).lean()
+    const shareJournals = Boolean(patient.privacySettings?.shareJournals)
+    const shareMetrics = Boolean(patient.privacySettings?.shareMetrics ?? true)
 
-    const logs = await DailyLog.find({ userId: patientId }).sort({ date: 1 }).lean()
-    if (!patient.privacySettings?.shareJournals) {
-      logs.forEach((log) => { log.journal = '' })
-    }
-    res.json({ success: true, data: { patient, logs } })
+    const sanitizedLogs = logs.map((log) => ({
+      ...log,
+      journal: shareJournals ? (log.journal || '') : '',
+      mood: shareMetrics ? log.mood : null,
+      executiveFunction: shareMetrics ? log.executiveFunction : null,
+      sensoryOverload: shareMetrics ? log.sensoryOverload : null,
+      maskingFatigue: shareMetrics ? log.maskingFatigue : null,
+    }))
+
+    res.json({
+      success: true,
+      data: {
+        patient: {
+          id: patient._id,
+          name: patient.name,
+          pronouns: patient.pronouns,
+          privacySettings: patient.privacySettings,
+        },
+        logs: sanitizedLogs,
+        privacy: { shareJournals, shareMetrics },
+      },
+    })
   } catch (err) {
     next(err)
   }

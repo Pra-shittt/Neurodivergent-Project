@@ -5,6 +5,7 @@
  */
 
 import axios from 'axios'
+import { detectTriggersFromText } from '../utils/triggerDetector.js'
 
 // Normalize API base URL: strip trailing slash and ensure /api/v1 prefix
 // In production (e.g. Vercel unified deployment), defaults to relative '/api/v1' for seamless same-origin calls
@@ -153,7 +154,7 @@ export const api = {
   submitAssessment: (_userId, templateId, answers) =>
     safe(() => client.post('/assessments/submit', { templateId, answers })),
 
-  // User Profile
+  // User Profile & Privacy
   updateProfile: (data) =>
     safe(() => client.patch('/users/profile', data)),
 
@@ -162,6 +163,12 @@ export const api = {
 
   getInviteCode: () =>
     safe(() => client.get('/users/invite-code')),
+
+  linkClinician: (clinicianEmail) =>
+    safe(() => client.post('/users/link-clinician', { clinicianEmail })),
+
+  unlinkClinician: () =>
+    safe(() => client.post('/users/unlink-clinician')),
 
   // Clinician
   getClinicianPatients: (_clinicianId) =>
@@ -174,5 +181,30 @@ export const api = {
     safe(() => client.post('/clinician/notes', { patientId, content })),
 
   linkPatient: (_clinicianId, inviteCode) =>
-    safe(() => client.post('/clinician/link-patient', { inviteCode })),
+    safe(() => client.post('/clinician/link-patient', { inviteCode: inviteCode?.trim() })),
+
+  unlinkPatient: (_clinicianId, patientId) =>
+    safe(() => client.post('/clinician/unlink-patient', { patientId })),
+
+  getPatientLogs: (_clinicianId, patientId) =>
+    safe(() => client.get(`/clinician/patients/${patientId}/logs`)),
+
+  // Trigger detection (Server-first with smart client fallback)
+  detectTriggers: async (text, ratings = {}) => {
+    try {
+      const res = await safe(() => client.post('/ai/detect-triggers', { text, ratings }))
+      if (res.success && res.data) {
+        return res
+      }
+    } catch {}
+    const local = detectTriggersFromText(text)
+    return {
+      success: true,
+      data: {
+        triggers: local.detectedItems,
+        matchedTriggers: local.matchedTriggers,
+        summary: local.summary,
+      },
+    }
+  },
 }

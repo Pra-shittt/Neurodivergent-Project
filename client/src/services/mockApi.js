@@ -3,6 +3,8 @@
 // Replace each method with real Axios/Fetch calls in Phase 2
 // ============================================================
 
+import { detectTriggersFromText } from '../utils/triggerDetector.js'
+
 const delay = (ms = 600) => new Promise(r => setTimeout(r, ms))
 
 // ── Seed Data ──────────────────────────────────────────────
@@ -318,15 +320,145 @@ export const mockApi = {
     return { success: true, data: { note } }
   },
 
+  // User Profile & Privacy
+  async getInviteCode(userId) {
+    await delay(200)
+    const user = USERS.find(u => u.id === userId || u._id === userId)
+    if (!user || user.role !== 'individual') {
+      return { success: false, error: 'Only individuals have invite codes.' }
+    }
+    const clinician = USERS.find(u => u.id === user.clinicianId || u._id === user.clinicianId)
+    return {
+      success: true,
+      data: {
+        inviteCode: user.inviteCode,
+        privacySettings: user.privacySettings || { shareMetrics: true, shareJournals: false },
+        clinician: clinician ? {
+          id: clinician.id,
+          name: clinician.name,
+          email: clinician.email,
+          pronouns: clinician.pronouns,
+        } : null,
+      },
+    }
+  },
+
+  async updatePrivacy(settings) {
+    await delay(200)
+    // Update logged in user (or first individual for mock)
+    const user = USERS.find(u => u.role === 'individual')
+    if (user) {
+      user.privacySettings = { ...(user.privacySettings || {}), ...settings }
+    }
+    return { success: true, data: { privacySettings: user?.privacySettings } }
+  },
+
+  async linkClinician(clinicianEmail) {
+    await delay(250)
+    const clinician = USERS.find(u => u.email?.toLowerCase() === clinicianEmail?.toLowerCase() && u.role === 'clinician')
+    if (!clinician) return { success: false, error: 'No clinician found with that email address.' }
+    const patient = USERS.find(u => u.role === 'individual')
+    if (patient) {
+      patient.clinicianId = clinician.id
+      if (!clinician.patientIds) clinician.patientIds = []
+      if (!clinician.patientIds.includes(patient.id)) clinician.patientIds.push(patient.id)
+    }
+    return {
+      success: true,
+      data: {
+        clinician: {
+          id: clinician.id,
+          name: clinician.name,
+          email: clinician.email,
+          pronouns: clinician.pronouns,
+        },
+      },
+    }
+  },
+
+  async unlinkClinician() {
+    await delay(200)
+    const patient = USERS.find(u => u.role === 'individual')
+    if (patient && patient.clinicianId) {
+      const clinician = USERS.find(u => u.id === patient.clinicianId)
+      if (clinician && clinician.patientIds) {
+        clinician.patientIds = clinician.patientIds.filter(id => id !== patient.id)
+      }
+      patient.clinicianId = null
+    }
+    return { success: true, data: { message: 'Successfully unlinked clinician.' } }
+  },
+
   // Link patient to clinician
   async linkPatient(clinicianId, inviteCode) {
     await delay()
-    const patient = USERS.find(u => u.inviteCode === inviteCode && u.role === 'individual')
+    const code = (inviteCode || '').trim().toUpperCase()
+    const patient = USERS.find(u => (u.inviteCode || '').toUpperCase() === code && u.role === 'individual')
     if (!patient) return { success: false, error: 'Invalid invite code.' }
-    const clinician = USERS.find(u => u.id === clinicianId)
+    const clinician = USERS.find(u => u.id === clinicianId || u._id === clinicianId)
+    if (!clinician) return { success: false, error: 'Clinician not found.' }
+    if (!clinician.patientIds) clinician.patientIds = []
     if (!clinician.patientIds.includes(patient.id)) clinician.patientIds.push(patient.id)
-    patient.clinicianId = clinicianId
+    patient.clinicianId = clinician.id
     return { success: true, data: { patient: { name: patient.name, id: patient.id } } }
+  },
+
+  async unlinkPatient(clinicianId, patientId) {
+    await delay()
+    const clinician = USERS.find(u => u.id === clinicianId || u._id === clinicianId)
+    if (clinician && clinician.patientIds) {
+      clinician.patientIds = clinician.patientIds.filter(id => id !== patientId)
+    }
+    const patient = USERS.find(u => u.id === patientId || u._id === patientId)
+    if (patient) patient.clinicianId = null
+    return { success: true, data: { message: 'Patient removed from roster.' } }
+  },
+
+  async getPatientLogs(clinicianId, patientId) {
+    await delay(300)
+    const patient = USERS.find(u => u.id === patientId || u._id === patientId)
+    if (!patient) return { success: false, error: 'Patient not found.' }
+    const logs = LOGS[patientId] || LOGS[patient.id] || []
+    const shareJournals = Boolean(patient.privacySettings?.shareJournals)
+    const shareMetrics = Boolean(patient.privacySettings?.shareMetrics ?? true)
+
+    const sanitizedLogs = logs.map(l => ({
+      ...l,
+      journal: shareJournals ? (l.journal || '') : '',
+      mood: shareMetrics ? l.mood : null,
+      executiveFunction: shareMetrics ? l.executiveFunction : null,
+      sensoryOverload: shareMetrics ? l.sensoryOverload : null,
+      maskingFatigue: shareMetrics ? l.maskingFatigue : null,
+    }))
+
+    return {
+      success: true,
+      data: {
+        patient: {
+          id: patient.id,
+          name: patient.name,
+          pronouns: patient.pronouns,
+          privacySettings: patient.privacySettings,
+        },
+        logs: sanitizedLogs.slice().reverse(),
+        privacy: { shareJournals, shareMetrics },
+      },
+    }
+  },
+
+  // Trigger detection
+  async detectTriggers(text, ratings = {}) {
+    await delay(150)
+    const res = detectTriggersFromText(text)
+    return {
+      success: true,
+      data: {
+        triggers: res.detectedItems,
+        matchedTriggers: res.matchedTriggers,
+        summary: res.summary,
+        ratings,
+      },
+    }
   },
 
   // Audio transcription & NLP
@@ -345,12 +477,21 @@ export const mockApi = {
         return { success: true, data: json.data }
       }
     } catch {
-      // Fallback to simulated NLP response if local AI service is not running
+      // Fallback to local simulated audio transcription & NLP
     }
-    // Return clear connection error if local service is not reachable
+    
+    // Graceful intelligent simulation for offline / testing mode
+    const simulatedText = "The fluorescent lights in the open office were flickering and buzzing. Loud chatter made me lose focus, causing severe brain fog and task paralysis before my deadline."
+    const detected = detectTriggersFromText(simulatedText)
     return {
-      success: false,
-      error: 'Speech AI service on port 8000 is not reachable. Please start it with: uvicorn app.main:app --port 8000',
+      success: true,
+      data: {
+        transcript: simulatedText,
+        ai_insights: {
+          triggers: detected.detectedItems,
+        },
+        notice: '(Simulated voice transcription — Fast Whisper AI server offline)',
+      },
     }
   },
 }

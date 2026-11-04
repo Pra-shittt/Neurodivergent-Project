@@ -3,6 +3,8 @@ import sys
 import tempfile
 import logging
 import importlib.util
+from typing import Optional, Dict, Any
+from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,6 +71,15 @@ app.add_middleware(
 )
 
 
+class AnalyzeTextRequest(BaseModel):
+    text: str
+    mood: Optional[int] = 3
+    sensory_overload: Optional[int] = 1
+    executive_function: Optional[int] = 3
+    masking_fatigue: Optional[int] = 1
+    ratings: Optional[Dict[str, Any]] = None
+
+
 @app.get("/health")
 @app.get("/api/v1/health")
 def health_check():
@@ -77,6 +88,38 @@ def health_check():
         "service": "ai-service",
         "nlp_engine_loaded": analyze_journal_text is not None,
     }
+
+
+@app.post("/api/v1/analyze-text")
+@app.post("/analyze")
+async def analyze_text(payload: AnalyzeTextRequest):
+    if not payload.text or not payload.text.strip():
+        return JSONResponse(
+            content={
+                "status": "success",
+                "data": {
+                    "triggers": [],
+                    "ratings": {},
+                },
+            }
+        )
+
+    if analyze_journal_text is None:
+        raise HTTPException(status_code=500, detail="NLP engine not available.")
+
+    ratings = payload.ratings or {
+        "mood": payload.mood,
+        "sensory_overload": payload.sensory_overload,
+        "executive_function": payload.executive_function,
+        "masking_fatigue": payload.masking_fatigue,
+    }
+    nlp_results = analyze_journal_text(payload.text, ratings)
+    return JSONResponse(
+        content={
+            "status": "success",
+            "data": nlp_results,
+        }
+    )
 
 
 @app.post("/api/v1/analyze-audio")

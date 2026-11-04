@@ -3,7 +3,10 @@ import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/apiClient'
 import Modal from '../components/Modal'
 import { LineChart, Line, Tooltip, ResponsiveContainer } from 'recharts'
-import { Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2, Loader2, Search, ClipboardCheck } from 'lucide-react'
+import {
+  Users, AlertTriangle, ChevronRight, NotebookPen, TrendingUp, Link2,
+  Loader2, Search, ClipboardCheck, BookOpen, Lock, Tag, Calendar, Eye
+} from 'lucide-react'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -24,6 +27,10 @@ export default function ClinicianWorkstation() {
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [selectedPatientForAssessments, setSelectedPatientForAssessments] = useState(null)
   const [assessmentModalOpen, setAssessmentModalOpen] = useState(false)
+  const [selectedPatientForDiary, setSelectedPatientForDiary] = useState(null)
+  const [diaryModalOpen, setDiaryModalOpen] = useState(false)
+  const [diaryLogs, setDiaryLogs] = useState([])
+  const [loadingDiary, setLoadingDiary] = useState(false)
   const [notes, setNotes] = useState([])
   const [noteText, setNoteText] = useState('')
   const [noteModalOpen, setNoteModalOpen] = useState(false)
@@ -33,23 +40,39 @@ export default function ClinicianWorkstation() {
   const [savingNote, setSavingNote] = useState(false)
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    apiClient.getClinicianPatients(user._id || user.id).then(res => {
-      if (res.success) setPatients(res.data.patients)
+  const fetchRoster = () => {
+    return apiClient.getClinicianPatients(user._id || user.id).then(res => {
+      if (res.success && res.data?.patients) setPatients(res.data.patients)
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    fetchRoster()
   }, [user._id, user.id])
 
   const openPatient = async (p) => {
     setSelectedPatient(p)
     const res = await apiClient.getClinicalNotes(user._id || user.id, p._id || p.id)
-    if (res.success) setNotes(res.data.notes)
+    if (res.success) setNotes(res.data.notes || [])
     setNoteModalOpen(true)
   }
 
   const openAssessments = (p) => {
     setSelectedPatientForAssessments(p)
     setAssessmentModalOpen(true)
+  }
+
+  const openDiary = async (p) => {
+    setSelectedPatientForDiary(p)
+    setDiaryModalOpen(true)
+    setLoadingDiary(true)
+    setDiaryLogs([])
+    const res = await apiClient.getPatientLogs(user._id || user.id, p._id || p.id)
+    if (res.success && res.data) {
+      setDiaryLogs(res.data.logs || [])
+    }
+    setLoadingDiary(false)
   }
 
   const saveNote = async () => {
@@ -65,14 +88,14 @@ export default function ClinicianWorkstation() {
 
   const linkPatient = async () => {
     setLinkMsg(null)
-    const res = await apiClient.linkPatient(user._id || user.id, inviteCode)
+    const cleanCode = inviteCode.trim().toUpperCase()
+    const res = await apiClient.linkPatient(user._id || user.id, cleanCode)
     if (res.success) {
       setLinkMsg({ type: 'success', text: `✓ Linked ${res.data.patient.name} to your roster.` })
-      const refreshed = await apiClient.getClinicianPatients(user._id || user.id)
-      if (refreshed.success) setPatients(refreshed.data.patients)
+      await fetchRoster()
       setInviteCode('')
     } else {
-      setLinkMsg({ type: 'error', text: res.error })
+      setLinkMsg({ type: 'error', text: res.error || 'Failed to link patient with that invite code.' })
     }
   }
 
@@ -80,8 +103,8 @@ export default function ClinicianWorkstation() {
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  const getChartData = (p) => (p.recentLogs || []).map(l => ({
-    date: l.date.slice(5),
+  const getChartData = (p) => (p.recentLogs || []).slice(0, 7).reverse().map(l => ({
+    date: l.date?.slice(5) || '',
     Masking: l.maskingFatigue,
     Mood: l.mood,
     Sensory: l.sensoryOverload,
@@ -160,6 +183,9 @@ export default function ClinicianWorkstation() {
         {filteredPatients.map(p => {
           const chartData = getChartData(p)
           const patientAssessments = p.assessments || []
+          const latestLog = p.recentLogs?.[0]
+          const isJournalsShared = Boolean(p.privacySettings?.shareJournals)
+
           return (
             <div key={p._id || p.id} className="glass-card" style={{ padding: '22px 24px', display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
               {/* Patient info */}
@@ -173,32 +199,54 @@ export default function ClinicianWorkstation() {
                       <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{p.name}</h2>
                       {p.burnoutFlag && <span style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--accent-rose)', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99 }}>🚨 BURNOUT RISK</span>}
                     </div>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{p.pronouns} · {(p.diagnoses || []).join(', ')}</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {p.pronouns} · {(p.diagnoses || []).join(', ') || 'No diagnoses listed'}
+                      {p.inviteCode && <span style={{ marginLeft: 6, opacity: 0.8 }}>· Code: <code style={{ color: 'var(--accent-teal)' }}>{p.inviteCode}</code></span>}
+                    </p>
                   </div>
                 </div>
 
                 {/* Latest daily metrics */}
-                {p.recentLogs?.[p.recentLogs.length - 1] && (() => {
-                  const l = p.recentLogs[p.recentLogs.length - 1]
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-                      {[
-                        { k: 'Mood', v: l.mood, c: '--accent-teal' },
-                        { k: 'Exec. Fn.', v: l.executiveFunction, c: '--accent-purple' },
-                        { k: 'Sensory', v: l.sensoryOverload, c: '--accent-amber' },
-                        { k: 'Masking', v: l.maskingFatigue, c: '--accent-rose' },
-                      ].map(m => (
-                        <div key={m.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 10px' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{m.k}</span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: `var(${m.c})` }}>{m.v}/5</span>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })()}
+                {latestLog && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                    {[
+                      { k: 'Mood', v: latestLog.mood, c: '--accent-teal' },
+                      { k: 'Exec. Fn.', v: latestLog.executiveFunction, c: '--accent-purple' },
+                      { k: 'Sensory', v: latestLog.sensoryOverload, c: '--accent-amber' },
+                      { k: 'Masking', v: latestLog.maskingFatigue, c: '--accent-rose' },
+                    ].map(m => (
+                      <div key={m.k} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 10px' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{m.k}</span>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: `var(${m.c})` }}>{m.v !== null ? `${m.v}/5` : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Latest Diary Snippet preview if shared */}
+                <div style={{ marginTop: 10 }}>
+                  {isJournalsShared ? (
+                    latestLog?.journal ? (
+                      <div style={{ background: 'rgba(78, 205, 196, 0.08)', border: '1px solid rgba(78, 205, 196, 0.2)', padding: '6px 10px', borderRadius: 8, fontSize: '0.74rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--accent-teal)' }}>Latest Diary: </span>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          "{latestLog.journal.slice(0, 95)}{latestLog.journal.length > 95 ? '…' : ''}"
+                        </span>
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        Diary shared · No entries logged yet.
+                      </p>
+                    )
+                  ) : (
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Lock size={11} /> Patient has kept personal diary entries private.
+                    </p>
+                  )}
+                </div>
 
                 {/* Assessment score pills on the patient card */}
-                <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: 10 }}>
                   <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <ClipboardCheck size={12} color="var(--accent-teal)" /> Formal Assessments ({patientAssessments.length})
                   </p>
@@ -236,7 +284,7 @@ export default function ClinicianWorkstation() {
               {/* Mini trend chart */}
               {chartData.length > 0 && (
                 <div style={{ flex: '1 1 200px' }}>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}><TrendingUp size={11} />Recent 3-Day Trend</p>
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}><TrendingUp size={11} />Recent 7-Day Trend</p>
                   <ResponsiveContainer width="100%" height={90}>
                     <LineChart data={chartData}>
                       <Line type="monotone" dataKey="Masking" stroke="var(--accent-rose)" strokeWidth={1.5} dot={false} />
@@ -249,6 +297,28 @@ export default function ClinicianWorkstation() {
 
               {/* Action buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                {/* View Diary Entries Button */}
+                <button
+                  onClick={() => openDiary(p)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: '0.8rem',
+                    padding: '7px 13px',
+                    borderRadius: 8,
+                    border: '1px solid var(--accent-purple)',
+                    background: 'rgba(124, 106, 247, 0.12)',
+                    color: 'var(--accent-purple-soft)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <BookOpen size={14} /> Diary Entries
+                </button>
+
+                {/* Assessments button */}
                 <button
                   onClick={() => openAssessments(p)}
                   style={{
@@ -269,6 +339,7 @@ export default function ClinicianWorkstation() {
                   <ClipboardCheck size={14} /> Assessments ({patientAssessments.length})
                 </button>
 
+                {/* Notes button */}
                 <button
                   onClick={() => openPatient(p)}
                   className="btn-primary"
@@ -281,6 +352,90 @@ export default function ClinicianWorkstation() {
           )
         })}
       </div>
+
+      {/* Patient Diary / Journal Modal */}
+      <Modal
+        isOpen={diaryModalOpen}
+        onClose={() => setDiaryModalOpen(false)}
+        title={`📖 Patient Diary Entries — ${selectedPatientForDiary?.name}`}
+        maxWidth={640}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {loadingDiary ? (
+            <div style={{ padding: '40px', textAlign: 'center' }}>
+              <Loader2 size={28} style={{ color: 'var(--accent-purple)', animation: 'spin 1s linear infinite' }} />
+              <p style={{ marginTop: 10, color: 'var(--text-muted)', fontSize: '0.85rem' }}>Loading diary entries…</p>
+            </div>
+          ) : !selectedPatientForDiary?.privacySettings?.shareJournals ? (
+            <div style={{
+              padding: '28px 24px',
+              borderRadius: 12,
+              background: 'rgba(245, 166, 35, 0.08)',
+              border: '1px solid rgba(245, 166, 35, 0.25)',
+              textAlign: 'center',
+            }}>
+              <Lock size={32} color="var(--accent-amber)" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+                Personal Diary Kept Private
+              </h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 460, margin: '0 auto' }}>
+                {selectedPatientForDiary?.name} has currently set their personal diary entries to private.
+                To support patient psychological safety, free-text reflections remain private unless enabled by the patient in their dashboard sharing settings.
+              </p>
+            </div>
+          ) : diaryLogs.filter(l => l.journal).length === 0 ? (
+            <div style={{ padding: '36px', textAlign: 'center' }}>
+              <BookOpen size={36} color="var(--text-muted)" style={{ marginBottom: 10 }} />
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                No journal entries logged by this patient yet.
+              </p>
+            </div>
+          ) : (
+            <div style={{ maxHeight: 420, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {diaryLogs.filter(l => l.journal).map(log => (
+                <div
+                  key={log.id || log._id}
+                  style={{
+                    padding: '16px 18px',
+                    borderRadius: 10,
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border)',
+                    borderLeft: '4px solid var(--accent-purple)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      <Calendar size={13} /> {log.date}
+                    </div>
+                    {/* Metrics snapshot */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem' }}>
+                      <span style={{ color: 'var(--accent-teal)' }}>Mood: {log.mood}/5</span>
+                      <span style={{ color: 'var(--accent-purple)' }}>Exec: {log.executiveFunction}/5</span>
+                      <span style={{ color: 'var(--accent-amber)' }}>Sensory: {log.sensoryOverload}/5</span>
+                      <span style={{ color: 'var(--accent-rose)' }}>Masking: {log.maskingFatigue}/5</span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {log.journal}
+                  </p>
+
+                  {/* Trigger chips */}
+                  {log.triggers?.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                      {log.triggers.map(t => (
+                        <span key={t} className="badge badge-purple" style={{ fontSize: '0.7rem' }}>
+                          <Tag size={10} style={{ marginRight: 4 }} />{t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
 
       {/* Patient Assessments Modal */}
       <Modal
@@ -407,7 +562,7 @@ export default function ClinicianWorkstation() {
           {linkMsg && (
             <p style={{ fontSize: '0.82rem', color: linkMsg.type === 'success' ? 'var(--accent-teal)' : 'var(--accent-rose)', fontWeight: 600 }}>{linkMsg.text}</p>
           )}
-          <button onClick={linkPatient} disabled={!inviteCode} className="btn-primary">Link Patient</button>
+          <button onClick={linkPatient} disabled={!inviteCode.trim()} className="btn-primary">Link Patient</button>
         </div>
       </Modal>
 

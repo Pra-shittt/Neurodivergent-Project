@@ -28,8 +28,13 @@ LOCAL_SNAPSHOT_DIR = os.path.abspath(
 )
 model_source = LOCAL_SNAPSHOT_DIR if os.path.isdir(LOCAL_SNAPSHOT_DIR) else "base"
 
-# Initialize the Whisper model (base model, CPU, int8 quantization)
-stt_model = WhisperModel(model_source, device="cpu", compute_type="int8")
+_stt_model = None
+
+def get_stt_model():
+    global _stt_model
+    if _stt_model is None:
+        _stt_model = WhisperModel(model_source, device="cpu", compute_type="int8")
+    return _stt_model
 
 # Known Whisper phantom hallucinations on silence, breathing, or background noise
 HALLUCINATION_PATTERNS = [
@@ -99,7 +104,8 @@ def transcribe_audio_file(file_path: str) -> str:
         # Using vad_filter=True to strip non-speech background noise,
         # temperature=0.0 for deterministic decoding (no random sampling),
         # condition_on_previous_text=False to prevent hallucination carryover.
-        segments, info = stt_model.transcribe(
+        model = get_stt_model()
+        segments, info = model.transcribe(
             file_path,
             beam_size=5,
             vad_filter=True,
