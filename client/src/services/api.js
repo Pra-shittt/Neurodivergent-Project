@@ -6,8 +6,21 @@
 
 import axios from 'axios'
 
+// Normalize API base URL: strip trailing slash and ensure /api/v1 prefix
+// In production (e.g. Vercel unified deployment), defaults to relative '/api/v1' for seamless same-origin calls
+const getApiBaseUrl = () => {
+  let url = (
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5000/api/v1')
+  ).trim()
+  url = url.replace(/\/+$/, '')
+  if (url.endsWith('/api/v1')) return url
+  if (url.endsWith('/api')) return `${url}/v1`
+  return `${url}/api/v1`
+}
+
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
+  baseURL: getApiBaseUrl(),
   withCredentials: true, // Send httpOnly cookies automatically
   headers: { 'Content-Type': 'application/json' },
 })

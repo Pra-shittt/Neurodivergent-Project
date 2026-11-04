@@ -43,16 +43,26 @@ from .audio_stt import transcribe_audio_file
 
 app = FastAPI(title="NeuroPortal Audio & NLP AI Service")
 
+# Parse origins from CLIENT_URL environment variable if set
+custom_client_origins = [
+    url.strip().rstrip("/")
+    for url in os.getenv("CLIENT_URL", "").split(",")
+    if url.strip()
+]
+
 # Enable CORS for frontend requests (explicit local origins + regex for local & cloud dev ports)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:5000",
         "http://127.0.0.1:5000",
+        *custom_client_origins,
     ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com|.*\.railway\.app)(:\d+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.netlify\.app|.*\.onrender\.com|.*\.railway\.app|.*\.pages\.dev|.*\.github\.io)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
